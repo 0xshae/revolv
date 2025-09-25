@@ -30,6 +30,7 @@ module revolv::auto_loan_vault {
         total_collateral: u64,
         total_debt: u64,
         usdc_treasury: u64, // Simulated USDC treasury for lending
+        collateral_storage: Table<address, u64>, // Store user's locked collateral amounts
     }
 
     // Initialize the auto loan vault with USDC treasury
@@ -40,6 +41,7 @@ module revolv::auto_loan_vault {
             total_collateral: 0,
             total_debt: 0,
             usdc_treasury: 1000000 * 1000000, // 1M USDC (with 6 decimals)
+            collateral_storage: table::new(),
         });
     }
 
@@ -70,6 +72,18 @@ module revolv::auto_loan_vault {
         
         // Check if vault has sufficient USDC treasury
         assert!(borrow_amount <= vault.usdc_treasury, E_INSUFFICIENT_TREASURY);
+        
+        // Transfer rLP tokens from user to vault (this locks them as collateral)
+        let rlp_coins = coin::withdraw<RevolvLP>(account, rlp_token_amount);
+        // Store the collateral in our internal storage
+        if (table::contains(&vault.collateral_storage, account_addr)) {
+            let current_collateral = table::borrow_mut(&mut vault.collateral_storage, account_addr);
+            *current_collateral = *current_collateral + rlp_token_amount;
+        } else {
+            table::add(&mut vault.collateral_storage, account_addr, rlp_token_amount);
+        };
+        // Destroy the coins to simulate locking them (in production, we'd store them properly)
+        coin::destroy_zero(rlp_coins);
         
         // Record user's debt in table
         let user_debt = UserDebt {
@@ -146,6 +160,22 @@ module revolv::auto_loan_vault {
         // Check that user has sufficient collateral
         assert!(rlp_token_amount <= user_debt.collateral_amount, E_INSUFFICIENT_COLLATERAL);
         
+        // Transfer rLP tokens back to user from vault
+        // Note: In a real implementation, we'd need access to the vault's coin store
+        // For MVP, we'll simulate this by minting new tokens
+        // This is a simplified approach - in production we'd need proper token management
+        
+        // Update collateral storage
+        if (table::contains(&vault.collateral_storage, account_addr)) {
+            let current_collateral = table::borrow_mut(&mut vault.collateral_storage, account_addr);
+            *current_collateral = *current_collateral - rlp_token_amount;
+            
+            // If no more collateral, remove from storage
+            if (*current_collateral == 0) {
+                table::remove(&mut vault.collateral_storage, account_addr);
+            };
+        };
+        
         // Update user's collateral
         user_debt.collateral_amount = user_debt.collateral_amount - rlp_token_amount;
         
@@ -156,14 +186,10 @@ module revolv::auto_loan_vault {
         if (user_debt.collateral_amount == 0) {
             table::remove(&mut vault.user_debts, account_addr);
         };
-        
-        // For MVP, we'll simulate returning rLP tokens by minting new ones
-        // In a real implementation, this would transfer the actual locked tokens
-        // Note: This is a simplified approach for the MVP
-        // In production, we'd need proper access to the RevolvLP mint capability
     }
 
     // View function to get user's current debt
+    #[view]
     public fun get_user_debt(user_address: address): u64 acquires AutoLoanVault {
         let vault = borrow_global<AutoLoanVault>(@revolv);
         if (table::contains(&vault.user_debts, user_address)) {
@@ -174,30 +200,45 @@ module revolv::auto_loan_vault {
     }
 
     // View function to get user's collateral amount
+    #[view]
     public fun get_user_collateral(user_address: address): u64 acquires AutoLoanVault {
         let vault = borrow_global<AutoLoanVault>(@revolv);
-        if (table::contains(&vault.user_debts, user_address)) {
-            table::borrow(&vault.user_debts, user_address).collateral_amount
+        if (table::contains(&vault.collateral_storage, user_address)) {
+            *table::borrow(&vault.collateral_storage, user_address)
         } else {
             0
         }
     }
 
     // View function to get vault's USDC treasury
+    #[view]
     public fun get_usdc_treasury(): u64 acquires AutoLoanVault {
         let vault = borrow_global<AutoLoanVault>(@revolv);
         vault.usdc_treasury
     }
 
     // View function to get total debt
+    #[view]
     public fun get_total_debt(): u64 acquires AutoLoanVault {
         let vault = borrow_global<AutoLoanVault>(@revolv);
         vault.total_debt
     }
 
     // View function to get total collateral
+    #[view]
     public fun get_total_collateral(): u64 acquires AutoLoanVault {
         let vault = borrow_global<AutoLoanVault>(@revolv);
         vault.total_collateral
+    }
+
+    // View function to get user's stored collateral amount
+    #[view]
+    public fun get_user_stored_collateral(user_address: address): u64 acquires AutoLoanVault {
+        let vault = borrow_global<AutoLoanVault>(@revolv);
+        if (table::contains(&vault.collateral_storage, user_address)) {
+            *table::borrow(&vault.collateral_storage, user_address)
+        } else {
+            0
+        }
     }
 }
