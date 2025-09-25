@@ -14,7 +14,7 @@ const LiquidityPage: React.FC<LiquidityPageProps> = ({ account }) => {
   const { connected, signAndSubmitTransaction } = useWallet();
   const { toast } = useToast();
   const [rlpBalance, setRlpBalance] = useState(0);
-  const [treasuryBalances, setTreasuryBalances] = useState<{[key: string]: number}>({});
+  const [, setTreasuryBalances] = useState<{[key: string]: number}>({});
   const [isDepositing, setIsDepositing] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
@@ -60,7 +60,9 @@ const LiquidityPage: React.FC<LiquidityPageProps> = ({ account }) => {
   // Calculate deposit value in USD
   const calculateDepositValue = (amount: string, token: string) => {
     const numAmount = parseFloat(amount) || 0;
-    return numAmount * (oraclePrices[token as keyof typeof oraclePrices] || 0);
+    const price = oraclePrices[token as keyof typeof oraclePrices] || 0;
+    console.log('calculateDepositValue:', { amount, token, numAmount, price });
+    return numAmount * price;
   };
 
   // Calculate rLP token price
@@ -201,19 +203,25 @@ const LiquidityPage: React.FC<LiquidityPageProps> = ({ account }) => {
     try {
       // Try to call a view function to check if vault is initialized
       // If it fails, modules are not initialized
-      await aptosClient().view({
+      const result = await aptosClient().view({
         payload: {
           function: `${MODULE_ADDRESS}::revolv_vault::get_total_value`,
           functionArguments: [],
         },
       });
       
-      console.log('Modules are already initialized');
+      console.log('Modules are already initialized, total_value:', result);
       setIsInitialized(true);
-    } catch (error) {
-      console.log('Modules not initialized yet, need to initialize');
+    } catch (error: any) {
+      console.log('Modules not initialized yet, need to initialize. Error:', error.message);
       setIsInitialized(false);
     }
+  };
+
+  // Force initialization check - bypass the automatic check
+  const forceInitializationCheck = async () => {
+    console.log('Force checking initialization...');
+    await checkInitialization();
   };
 
   // Deposit function to call revolv_vault.move
@@ -227,15 +235,27 @@ const LiquidityPage: React.FC<LiquidityPageProps> = ({ account }) => {
       return;
     }
 
+    // If not initialized, try to initialize first
+    if (!isInitialized) {
+      toast({
+        variant: "destructive",
+        title: "Modules Not Initialized",
+        description: "Please initialize the modules first by clicking 'Initialize Modules'",
+      });
+      return;
+    }
+
     setIsDepositing(true);
     
     // Show transaction initiation notification
-    const depositValue = calculateDepositValue(aptAmount, 'APT');
+    console.log('handleDeposit: Starting deposit with:', { aptAmount, selectedToken });
+    const depositValue = calculateDepositValue(aptAmount, selectedToken);
     const estimatedRlp = calculateRlpAmount(depositValue);
+    console.log('handleDeposit: Calculated values:', { depositValue, estimatedRlp });
     
     toast({
       title: "🔄 Transaction Initiated",
-      description: `Depositing ${aptAmount} APT ($${depositValue.toFixed(2)}) to receive ~${estimatedRlp.toFixed(4)} rLP tokens`,
+      description: `Depositing ${aptAmount} ${selectedToken} ($${depositValue.toFixed(2)}) to receive ~${estimatedRlp.toFixed(4)} rLP tokens`,
       duration: 0, // Persistent notification
     });
     
@@ -270,7 +290,7 @@ const LiquidityPage: React.FC<LiquidityPageProps> = ({ account }) => {
       // Show success notification with detailed explanation
       toast({
         title: "✅ Deposit Successful!",
-        description: `Successfully deposited ${aptAmount} APT and received ${estimatedRlp.toFixed(4)} rLP tokens. Your deposit increased the vault's TVL by $${depositValue.toFixed(2)} and you now own ${((estimatedRlp / (vaultStats.rlpSupply + estimatedRlp)) * 100).toFixed(2)}% of the pool.`,
+        description: `Successfully deposited ${aptAmount} ${selectedToken} and received ${estimatedRlp.toFixed(4)} rLP tokens. Your deposit increased the vault's TVL by $${depositValue.toFixed(2)} and you now own ${((estimatedRlp / (vaultStats.rlpSupply + estimatedRlp)) * 100).toFixed(2)}% of the pool.`,
         duration: 0, // Persistent notification
       });
 
@@ -291,7 +311,6 @@ const LiquidityPage: React.FC<LiquidityPageProps> = ({ account }) => {
       });
 
       // IMMEDIATE UI UPDATE - Update the UI state immediately
-      const depositValue = calculateDepositValue(aptAmount, 'APT');
       const newRlpBalance = rlpBalance + estimatedRlp;
       const newTvl = vaultStats.tvl + depositValue;
       const newRlpSupply = vaultStats.rlpSupply + estimatedRlp;
@@ -563,20 +582,46 @@ const LiquidityPage: React.FC<LiquidityPageProps> = ({ account }) => {
                 </div>
                 <h2 className="text-2xl font-light text-white mb-4">Initialize Protocol</h2>
                 <p className="text-gray-400 mb-8 font-light">One-time setup to activate the liquidity vault</p>
-                <Button 
-                  onClick={initializeModules} 
-                  className="bg-white text-black hover:bg-gray-100 px-8 py-3 rounded-full font-medium transition-all duration-200"
-                  disabled={isInitializing}
-                >
-                  {isInitializing ? (
-                    <div className="flex items-center space-x-2">
-                      <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
-                      <span>Initializing...</span>
-                    </div>
-                  ) : (
-                    'Initialize Protocol'
-                  )}
-                </Button>
+                <div className="space-y-4">
+                  <Button 
+                    onClick={initializeModules} 
+                    className="bg-white text-black hover:bg-gray-100 px-8 py-3 rounded-full font-medium transition-all duration-200"
+                    disabled={isInitializing}
+                  >
+                    {isInitializing ? (
+                      <div className="flex items-center space-x-2">
+                        <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                        <span>Initializing...</span>
+                      </div>
+                    ) : (
+                      'Initialize Protocol'
+                    )}
+                  </Button>
+                  
+                  <div className="space-y-2">
+                    <Button 
+                      onClick={forceInitializationCheck} 
+                      className="bg-gray-800 text-white hover:bg-gray-700 px-6 py-2 rounded-full font-light transition-all duration-200"
+                    >
+                      🔍 Debug: Check Initialization Status
+                    </Button>
+                    
+                    <Button 
+                      onClick={() => {
+                        console.log('MANUAL OVERRIDE: Setting isInitialized to true');
+                        setIsInitialized(true);
+                        toast({
+                          title: "⚠️ Manual Override",
+                          description: "Forced initialization status to true. If deposits still fail, the modules may not be properly initialized.",
+                          duration: 5000,
+                        });
+                      }}
+                      className="bg-red-900 text-red-100 hover:bg-red-800 px-6 py-2 rounded-full font-light transition-all duration-200"
+                    >
+                      ⚠️ Force Enable Deposits
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

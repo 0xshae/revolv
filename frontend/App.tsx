@@ -9,7 +9,6 @@ import { NetworkInfo } from "@/components/NetworkInfo";
 import { AccountInfo } from "@/components/AccountInfo";
 import { TransferAPT } from "@/components/TransferAPT";
 import { MessageBoard } from "@/components/MessageBoard";
-import { TopBanner } from "@/components/TopBanner";
 // Revolv Pages
 import LiquidityPage from "./pages/LiquidityPage";
 import AutoLoanPage from "./pages/AutoLoanPage";
