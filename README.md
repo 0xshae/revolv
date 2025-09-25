@@ -46,8 +46,7 @@ A revolutionary DeFi protocol built on Aptos that combines multi-token liquidity
 - Users can borrow up to 50% of their collateral value in USDC
 
 <img width="1307" height="792" alt="image" src="https://github.com/user-attachments/assets/a9a06999-f006-4c62-bdd9-c79f8d866b45" />
-<img width="770" height="834" alt="image" src="https://github.com/user-attachments/assets/e49b78f6-3a2f-48c6-809a-7a4fdd1677a9" />
-
+<img width="1047" height="832" alt="image" src="https://github.com/user-attachments/assets/3101bbe7-40d2-4e59-8edb-1b4c8a08848e" />
 
 ### 3. Auto-Repayment Mechanism
 - Yield generated from the liquidity pool accumulates
