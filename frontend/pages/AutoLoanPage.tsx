@@ -18,9 +18,23 @@ const AutoLoanPage: React.FC<AutoLoanPageProps> = ({ account }) => {
   const [currentDebt, setCurrentDebt] = useState(0);
   const [lockedCollateral, setLockedCollateral] = useState(0);
   const [pendingYield, setPendingYield] = useState(0);
+  const [userRlpBalance, setUserRlpBalance] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [isBorrowing, setIsBorrowing] = useState(false);
   const [isRepaying, setIsRepaying] = useState(false);
+  const [rlpPrice, setRlpPrice] = useState(10); // Default rLP price
+  const [maxBorrowable, setMaxBorrowable] = useState(0);
+  const [collateralValue, setCollateralValue] = useState(0);
+
+  // Calculate collateral value and max borrowable when rLP collateral changes
+  useEffect(() => {
+    const collateral = parseFloat(rlpCollateral) || 0;
+    const value = collateral * rlpPrice;
+    const maxBorrow = value * 0.5; // 50% LTV
+    
+    setCollateralValue(value);
+    setMaxBorrowable(maxBorrow);
+  }, [rlpCollateral, rlpPrice]);
 
   // Deposit and borrow function to call auto_loan_vault.move
   const handleDepositAndBorrow = async () => {
@@ -30,6 +44,26 @@ const AutoLoanPage: React.FC<AutoLoanPageProps> = ({ account }) => {
         variant: "destructive",
         title: "Error",
         description: "Please enter valid collateral and borrow amounts",
+      });
+      return;
+    }
+
+    // Validate collateral amount
+    if (parseFloat(rlpCollateral) > userRlpBalance) {
+      toast({
+        variant: "destructive",
+        title: "Insufficient rLP Balance",
+        description: `You only have ${userRlpBalance.toFixed(4)} rLP available`,
+      });
+      return;
+    }
+
+    // Validate borrow amount against LTV
+    if (parseFloat(borrowAmount) > maxBorrowable) {
+      toast({
+        variant: "destructive",
+        title: "Exceeds Maximum Borrowable",
+        description: `You can only borrow up to $${maxBorrowable.toFixed(2)} with ${rlpCollateral} rLP collateral (${collateralValue.toFixed(2)} value)`,
       });
       return;
     }
@@ -140,6 +174,50 @@ const AutoLoanPage: React.FC<AutoLoanPageProps> = ({ account }) => {
     }
   };
 
+  // Fetch user's rLP token balance
+  const fetchUserRlpBalance = async () => {
+    if (!account?.address || !MODULE_ADDRESS) {
+      console.log('Missing account or MODULE_ADDRESS:', { account: !!account, MODULE_ADDRESS });
+      return;
+    }
+
+    try {
+      console.log('Fetching rLP balance for:', account.address.toStringLong());
+      console.log('Coin type:', `${MODULE_ADDRESS}::revolv_vault::RevolvLP`);
+      
+      const balance = await aptosClient().getAccountCoinAmount({
+        accountAddress: account.address,
+        coinType: `${MODULE_ADDRESS}::revolv_vault::RevolvLP`,
+      });
+
+      console.log('Raw rLP balance:', balance);
+      const convertedBalance = balance / 100000000; // Convert from octas to readable format
+      console.log('Converted rLP balance:', convertedBalance);
+      
+      setUserRlpBalance(convertedBalance);
+    } catch (error) {
+      console.error('Failed to fetch rLP balance with getAccountCoinAmount:', error);
+      
+      // Fallback: try using view function
+      try {
+        console.log('Trying fallback method with view function...');
+        const response = await aptosClient().view({
+          payload: {
+            function: `${MODULE_ADDRESS}::revolv_vault::get_user_rlp_balance`,
+            functionArguments: [account.address.toStringLong()],
+          },
+        });
+        
+        const fallbackBalance = response[0] ? Number(response[0]) / 100000000 : 0;
+        console.log('Fallback rLP balance:', fallbackBalance);
+        setUserRlpBalance(fallbackBalance);
+      } catch (fallbackError) {
+        console.error('Fallback method also failed:', fallbackError);
+        setUserRlpBalance(0);
+      }
+    }
+  };
+
   // Fetch all on-chain data
   const fetchAllData = async () => {
     if (!account?.address || !MODULE_ADDRESS) {
@@ -182,6 +260,9 @@ const AutoLoanPage: React.FC<AutoLoanPageProps> = ({ account }) => {
       setLockedCollateral(collateralAmount);
       setPendingYield(yieldAmount);
 
+      // Also fetch user's rLP balance
+      await fetchUserRlpBalance();
+
     } catch (error) {
       console.error('Failed to fetch auto-loan data:', error);
       // Keep current values on error
@@ -192,9 +273,19 @@ const AutoLoanPage: React.FC<AutoLoanPageProps> = ({ account }) => {
 
   useEffect(() => {
     if (connected && account) {
+      console.log('Wallet connected, fetching data...');
       fetchAllData();
     }
   }, [connected, account]);
+
+  // Also fetch rLP balance when the component mounts if wallet is already connected
+  useEffect(() => {
+    console.log('AutoLoanPage useEffect triggered:', { connected, account: !!account, MODULE_ADDRESS });
+    if (connected && account && MODULE_ADDRESS) {
+      console.log('Component mounted, fetching rLP balance...');
+      fetchUserRlpBalance();
+    }
+  }, [connected, account, MODULE_ADDRESS]);
 
   return (
     <div className="min-h-screen bg-black">
@@ -210,18 +301,36 @@ const AutoLoanPage: React.FC<AutoLoanPageProps> = ({ account }) => {
 
         {/* Loan Status Cards */}
         {connected && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-20">
-            <div className="bg-gray-900/30 backdrop-blur-xl border border-gray-800 rounded-xl p-6 text-center">
-              <div className="text-3xl font-light text-red-400 mb-2">{currentDebt.toFixed(2)}</div>
-              <div className="text-sm text-gray-500 font-light tracking-wide uppercase">Current Debt</div>
+          <div className="mb-8">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-light text-white">Your Loan Status</h2>
+              <Button 
+                onClick={fetchAllData}
+                className="bg-gray-800 text-white hover:bg-gray-700 px-4 py-2 rounded-xl font-light"
+                disabled={isLoading}
+              >
+                {isLoading ? 'Refreshing...' : 'Refresh'}
+              </Button>
             </div>
-            <div className="bg-gray-900/30 backdrop-blur-xl border border-gray-800 rounded-xl p-6 text-center">
-              <div className="text-3xl font-light text-blue-400 mb-2">{lockedCollateral.toFixed(2)}</div>
-              <div className="text-sm text-gray-500 font-light tracking-wide uppercase">Locked Collateral</div>
-            </div>
-            <div className="bg-gray-900/30 backdrop-blur-xl border border-gray-800 rounded-xl p-6 text-center">
-              <div className="text-3xl font-light text-green-400 mb-2">{pendingYield.toFixed(2)}</div>
-              <div className="text-sm text-gray-500 font-light tracking-wide uppercase">Pending Yield</div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="bg-gray-900/30 backdrop-blur-xl border border-gray-800 rounded-xl p-6 text-center">
+                <div className="text-3xl font-light text-red-400 mb-2">{currentDebt.toFixed(2)}</div>
+                <div className="text-sm text-gray-500 font-light tracking-wide uppercase">Current Debt</div>
+              </div>
+              <div className="bg-gray-900/30 backdrop-blur-xl border border-gray-800 rounded-xl p-6 text-center">
+                <div className="text-3xl font-light text-blue-400 mb-2">{lockedCollateral.toFixed(2)}</div>
+                <div className="text-sm text-gray-500 font-light tracking-wide uppercase">Locked Collateral</div>
+              </div>
+              <div className="bg-gray-900/30 backdrop-blur-xl border border-gray-800 rounded-xl p-6 text-center">
+                <div className="text-3xl font-light text-green-400 mb-2">{pendingYield.toFixed(2)}</div>
+                <div className="text-sm text-gray-500 font-light tracking-wide uppercase">Pending Yield</div>
+              </div>
+              <div className="bg-gray-900/30 backdrop-blur-xl border border-gray-800 rounded-xl p-6 text-center">
+                <div className="text-3xl font-light text-white mb-2">{userRlpBalance.toFixed(2)}</div>
+                <div className="text-sm text-gray-500 font-light tracking-wide uppercase">Available rLP</div>
+                <div className="text-xs text-gray-600 mt-1">Debug: {userRlpBalance}</div>
+                <div className="text-xs text-gray-600 mt-1">Module: {MODULE_ADDRESS?.slice(0, 8)}...</div>
+              </div>
             </div>
           </div>
         )}
@@ -259,6 +368,24 @@ const AutoLoanPage: React.FC<AutoLoanPageProps> = ({ account }) => {
                         rLP
                       </div>
                     </div>
+                    
+                    <div className="flex justify-between items-center mt-4 text-sm text-gray-500">
+                      <span className="font-light">Available: {userRlpBalance.toFixed(4)} rLP</span>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setRlpCollateral(userRlpBalance.toString())}
+                        className="border-gray-700 text-gray-300 hover:bg-gray-800 rounded-full px-4 py-2 font-light"
+                      >
+                        Max
+                      </Button>
+                    </div>
+                    
+                    {parseFloat(rlpCollateral) > userRlpBalance && (
+                      <div className="mt-2 text-sm text-red-400 font-light">
+                        ⚠️ Insufficient rLP balance. You only have {userRlpBalance.toFixed(4)} rLP available.
+                      </div>
+                    )}
                   </div>
 
                   {/* Arrow */}
@@ -292,6 +419,35 @@ const AutoLoanPage: React.FC<AutoLoanPageProps> = ({ account }) => {
                         USDC
                       </div>
                     </div>
+                    
+                    <div className="flex justify-between items-center mt-4 text-sm text-gray-500">
+                      <span className="font-light">Max: ${maxBorrowable.toFixed(2)} USDC</span>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setBorrowAmount(maxBorrowable.toString())}
+                        className="border-gray-700 text-gray-300 hover:bg-gray-800 rounded-full px-4 py-2 font-light"
+                        disabled={maxBorrowable <= 0}
+                      >
+                        Max
+                      </Button>
+                    </div>
+                    
+                    <div className="mt-4 space-y-2">
+                      <div className="flex justify-between items-center text-sm text-gray-500">
+                        <span className="font-light">Collateral Value:</span>
+                        <span className="text-white">${collateralValue.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm text-gray-500">
+                        <span className="font-light">Max Borrowable (50% LTV):</span>
+                        <span className="text-green-400">${maxBorrowable.toFixed(2)}</span>
+                      </div>
+                      {parseFloat(borrowAmount) > maxBorrowable && (
+                        <div className="text-sm text-red-400 font-light">
+                          ⚠️ Exceeds maximum borrowable amount
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Loan Information */}
@@ -310,6 +466,18 @@ const AutoLoanPage: React.FC<AutoLoanPageProps> = ({ account }) => {
                         <span className="text-gray-400 font-light">Max Borrowable</span>
                         <span className="text-green-400 font-light">${Math.floor(parseFloat(rlpCollateral) * 10 * 0.5).toFixed(2)}</span>
                       </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 font-light">rLP Price</span>
+                        <span className="text-white font-light">$10.00</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 font-light">Interest Rate</span>
+                        <span className="text-white font-light">0% (Auto-repay)</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 font-light">Liquidation Threshold</span>
+                        <span className="text-red-400 font-light">75%</span>
+                      </div>
                     </div>
                   </div>
 
@@ -318,7 +486,9 @@ const AutoLoanPage: React.FC<AutoLoanPageProps> = ({ account }) => {
                     onClick={handleDepositAndBorrow} 
                     className="w-full h-16 text-xl bg-white text-black hover:bg-gray-100 rounded-2xl font-light transition-all duration-200"
                     disabled={isBorrowing || !rlpCollateral || !borrowAmount || 
-                             parseFloat(rlpCollateral) <= 0 || parseFloat(borrowAmount) <= 0}
+                             parseFloat(rlpCollateral) <= 0 || parseFloat(borrowAmount) <= 0 ||
+                             parseFloat(rlpCollateral) > userRlpBalance ||
+                             parseFloat(borrowAmount) > maxBorrowable}
                   >
                     {isBorrowing ? (
                       <div className="flex items-center space-x-3">

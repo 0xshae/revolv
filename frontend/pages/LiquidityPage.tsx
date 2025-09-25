@@ -3,7 +3,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { useWallet, InputTransactionData } from '@aptos-labs/wallet-adapter-react';
 import { aptosClient } from '../utils/aptosClient';
-import { MODULE_ADDRESS } from '../constants';
+import { MODULE_ADDRESS, getExplorerUrl } from '../constants';
 import { useToast } from '../components/ui/use-toast';
 
 interface LiquidityPageProps {
@@ -14,6 +14,7 @@ const LiquidityPage: React.FC<LiquidityPageProps> = ({ account }) => {
   const { connected, signAndSubmitTransaction } = useWallet();
   const { toast } = useToast();
   const [rlpBalance, setRlpBalance] = useState(0);
+  const [treasuryBalances, setTreasuryBalances] = useState<{[key: string]: number}>({});
   const [isDepositing, setIsDepositing] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
@@ -313,8 +314,6 @@ const LiquidityPage: React.FC<LiquidityPageProps> = ({ account }) => {
     }
 
     try {
-      setIsLoading(true);
-      
       // Get individual token balances
       const [aptBalance, usdcBalance, suiBalance, totalValue] = await Promise.all([
         aptosClient().view({
@@ -365,8 +364,6 @@ const LiquidityPage: React.FC<LiquidityPageProps> = ({ account }) => {
         'SUI': 5,
         'Total Value': 23
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
