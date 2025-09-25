@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '../components/ui/button';
-import { Card } from '../components/ui/card';
 import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
 import { useWallet, InputTransactionData } from '@aptos-labs/wallet-adapter-react';
 import { aptosClient } from '../utils/aptosClient';
 import { MODULE_ADDRESS } from '../constants';
@@ -38,6 +36,13 @@ const AutoLoanPage: React.FC<AutoLoanPageProps> = ({ account }) => {
 
     setIsBorrowing(true);
     
+    // Show transaction initiation notification
+    toast({
+      title: "🔄 Transaction Initiated",
+      description: `Depositing ${rlpCollateral} rLP as collateral to borrow ${borrowAmount} USDC`,
+      duration: 0, // Persistent notification
+    });
+    
     try {
       const collateralAmount = Math.floor(parseFloat(rlpCollateral) * 100000000); // Convert to octas
       const borrowAmountOctas = Math.floor(parseFloat(borrowAmount) * 1000000); // USDC has 6 decimals
@@ -53,8 +58,9 @@ const AutoLoanPage: React.FC<AutoLoanPageProps> = ({ account }) => {
       const response = await signAndSubmitTransaction(transaction);
       
       toast({
-        title: "Success",
-        description: `Borrow transaction submitted! Hash: ${response.hash}`,
+        title: "✅ Borrow Successful!",
+        description: `Successfully deposited ${rlpCollateral} rLP as collateral and borrowed ${borrowAmount} USDC. Your loan is now active and will auto-repay using yield. Transaction: ${response.hash.slice(0, 8)}...`,
+        duration: 0, // Persistent notification
       });
 
       // Clear inputs and refresh data
@@ -66,8 +72,9 @@ const AutoLoanPage: React.FC<AutoLoanPageProps> = ({ account }) => {
       console.error('Borrow failed:', error);
       toast({
         variant: "destructive",
-        title: "Borrow Failed",
+        title: "❌ Borrow Failed",
         description: error.message || "An error occurred during borrowing",
+        duration: 0, // Persistent notification
       });
     } finally {
       setIsBorrowing(false);
@@ -87,6 +94,13 @@ const AutoLoanPage: React.FC<AutoLoanPageProps> = ({ account }) => {
 
     setIsRepaying(true);
     
+    // Show transaction initiation notification
+    toast({
+      title: "🔄 Auto-Repay Initiated",
+      description: `Harvesting ${pendingYield.toFixed(2)} USDC yield to repay ${currentDebt.toFixed(2)} USDC debt`,
+      duration: 0, // Persistent notification
+    });
+    
     try {
       const transaction: InputTransactionData = {
         data: {
@@ -99,8 +113,9 @@ const AutoLoanPage: React.FC<AutoLoanPageProps> = ({ account }) => {
       const response = await signAndSubmitTransaction(transaction);
       
       toast({
-        title: "🎉 Success!",
-        description: `Yield harvested and debt repaid! Hash: ${response.hash}`,
+        title: "🎉 Auto-Repay Successful!",
+        description: `Yield harvested and debt repaid! Your loan decreased from ${currentDebt.toFixed(2)} to ${Math.max(0, currentDebt - pendingYield).toFixed(2)} USDC. Transaction: ${response.hash.slice(0, 8)}...`,
+        duration: 0, // Persistent notification
       });
 
       // THE CRITICAL MOMENT: Refresh all data to show the debt decrease
@@ -109,14 +124,16 @@ const AutoLoanPage: React.FC<AutoLoanPageProps> = ({ account }) => {
       toast({
         title: "✨ Debt Reduced!",
         description: "Your loan has been automatically repaid with yield!",
+        duration: 0, // Persistent notification
       });
       
     } catch (error: any) {
       console.error('Harvest and repay failed:', error);
       toast({
         variant: "destructive",
-        title: "Repay Failed",
+        title: "❌ Auto-Repay Failed",
         description: error.message || "An error occurred during repayment",
+        duration: 0, // Persistent notification
       });
     } finally {
       setIsRepaying(false);
@@ -180,146 +197,266 @@ const AutoLoanPage: React.FC<AutoLoanPageProps> = ({ account }) => {
   }, [connected, account]);
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
-      <h1 className="text-3xl font-bold mb-6">Revolv Auto-Loan</h1>
-      
-      {/* Wallet Connection Status */}
-      <Card className="p-6 mb-6">
-        <h2 className="text-xl font-semibold mb-4">Wallet Status</h2>
-        {!connected ? (
-          <div className="text-orange-600 font-medium">
-            ⚠️ Please connect your wallet using the button in the header
-          </div>
-        ) : (
-          <div className="text-green-600 font-medium">
-            ✅ Wallet Connected: {account?.address?.toStringLong()?.slice(0, 8)}...
+    <div className="min-h-screen bg-black">
+      <div className="container mx-auto px-6 py-12 max-w-7xl">
+        {/* Header */}
+        <div className="text-center mb-16">
+          <h1 className="text-6xl font-light tracking-tight text-white mb-4">
+            Auto-Loan
+          </h1>
+          <p className="text-xl text-gray-400 font-light tracking-wide">Borrow against your rLP tokens with auto-repayment</p>
+          <div className="mt-6 h-px bg-gradient-to-r from-transparent via-gray-600 to-transparent"></div>
+        </div>
+
+        {/* Loan Status Cards */}
+        {connected && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-20">
+            <div className="bg-gray-900/30 backdrop-blur-xl border border-gray-800 rounded-xl p-6 text-center">
+              <div className="text-3xl font-light text-red-400 mb-2">{currentDebt.toFixed(2)}</div>
+              <div className="text-sm text-gray-500 font-light tracking-wide uppercase">Current Debt</div>
+            </div>
+            <div className="bg-gray-900/30 backdrop-blur-xl border border-gray-800 rounded-xl p-6 text-center">
+              <div className="text-3xl font-light text-blue-400 mb-2">{lockedCollateral.toFixed(2)}</div>
+              <div className="text-sm text-gray-500 font-light tracking-wide uppercase">Locked Collateral</div>
+            </div>
+            <div className="bg-gray-900/30 backdrop-blur-xl border border-gray-800 rounded-xl p-6 text-center">
+              <div className="text-3xl font-light text-green-400 mb-2">{pendingYield.toFixed(2)}</div>
+              <div className="text-sm text-gray-500 font-light tracking-wide uppercase">Pending Yield</div>
+            </div>
           </div>
         )}
-      </Card>
 
-      {/* Deposit and Borrow Interface */}
-      {connected && (
-        <Card className="p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4">Deposit Collateral & Borrow</h2>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="rlp-collateral">rLP Tokens to Deposit as Collateral</Label>
-              <Input
-                id="rlp-collateral"
-                type="number"
-                value={rlpCollateral}
-                onChange={(e) => setRlpCollateral(e.target.value)}
-                placeholder="Enter rLP amount"
-              />
+        {/* Main Interface */}
+        {connected && (
+          <div className="max-w-4xl mx-auto">
+            <div className="bg-gray-900/40 backdrop-blur-2xl border border-gray-800 rounded-3xl p-12">
+              <div className="text-center mb-12">
+                <h2 className="text-4xl font-light text-white mb-4">Borrow Against rLP</h2>
+                <p className="text-gray-400 font-light text-lg">Deposit rLP tokens as collateral and borrow USDC</p>
+              </div>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
+                {/* Left: Borrow Interface */}
+                <div className="space-y-8">
+                  {/* Collateral Input */}
+                  <div>
+                    <div className="flex items-center space-x-4 mb-6">
+                      <div className="w-12 h-12 bg-gradient-to-r from-green-400 to-emerald-400 rounded-2xl flex items-center justify-center">
+                        <span className="text-white font-semibold text-xl">r</span>
+                      </div>
+                      <span className="text-2xl font-light text-white">rLP Collateral</span>
+                    </div>
+                    
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        value={rlpCollateral}
+                        onChange={(e) => setRlpCollateral(e.target.value)}
+                        placeholder="0.0"
+                        className="text-3xl h-20 pl-6 pr-24 bg-black/50 border-gray-800 text-white placeholder-gray-600 rounded-2xl font-light"
+                      />
+                      <div className="absolute right-6 top-1/2 transform -translate-y-1/2 text-gray-500 text-lg font-light">
+                        rLP
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Arrow */}
+                  <div className="flex justify-center">
+                    <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center">
+                      <svg className="w-6 h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                      </svg>
+                    </div>
+                  </div>
+
+                  {/* Borrow Amount */}
+                  <div>
+                    <h3 className="text-xl font-light mb-6 text-white">Borrow USDC</h3>
+                    <div className="flex items-center space-x-4 mb-6">
+                      <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center">
+                        <span className="text-black font-semibold text-xl">$</span>
+                      </div>
+                      <span className="text-2xl font-light text-white">USDC</span>
+                    </div>
+                    
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        value={borrowAmount}
+                        onChange={(e) => setBorrowAmount(e.target.value)}
+                        placeholder="0.0"
+                        className="text-3xl h-20 pl-6 pr-24 bg-black/50 border-gray-800 text-white placeholder-gray-600 rounded-2xl font-light"
+                      />
+                      <div className="absolute right-6 top-1/2 transform -translate-y-1/2 text-gray-500 text-lg font-light">
+                        USDC
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Loan Information */}
+                  <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700">
+                    <h4 className="text-lg font-light text-white mb-4">Loan Terms</h4>
+                    <div className="space-y-3 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 font-light">Maximum LTV</span>
+                        <span className="text-white font-light">50%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 font-light">Collateral Value</span>
+                        <span className="text-white font-light">${(parseFloat(rlpCollateral) * 10).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 font-light">Max Borrowable</span>
+                        <span className="text-green-400 font-light">${Math.floor(parseFloat(rlpCollateral) * 10 * 0.5).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Call to Action Button */}
+                  <Button 
+                    onClick={handleDepositAndBorrow} 
+                    className="w-full h-16 text-xl bg-white text-black hover:bg-gray-100 rounded-2xl font-light transition-all duration-200"
+                    disabled={isBorrowing || !rlpCollateral || !borrowAmount || 
+                             parseFloat(rlpCollateral) <= 0 || parseFloat(borrowAmount) <= 0}
+                  >
+                    {isBorrowing ? (
+                      <div className="flex items-center space-x-3">
+                        <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                        <span>Processing...</span>
+                      </div>
+                    ) : (
+                      'Deposit Collateral & Borrow USDC'
+                    )}
+                  </Button>
+                </div>
+
+                {/* Right: How It Works */}
+                <div className="space-y-8">
+                  <h3 className="text-3xl font-light text-white mb-8">How It Works</h3>
+                  
+                  <div className="space-y-6">
+                    {/* Step 1 */}
+                    <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700">
+                      <div className="flex items-start space-x-4">
+                        <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center flex-shrink-0">
+                          <span className="text-black font-semibold text-sm">1</span>
+                        </div>
+                        <div>
+                          <h4 className="text-lg font-light text-white mb-2">Deposit rLP as Collateral</h4>
+                          <p className="text-gray-400 font-light text-sm">Your rLP tokens are locked as collateral for the loan</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Step 2 */}
+                    <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700">
+                      <div className="flex items-start space-x-4">
+                        <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center flex-shrink-0">
+                          <span className="text-black font-semibold text-sm">2</span>
+                        </div>
+                        <div>
+                          <h4 className="text-lg font-light text-white mb-2">Borrow USDC</h4>
+                          <p className="text-gray-400 font-light text-sm">Borrow up to 50% of your collateral's value in USDC</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Step 3 */}
+                    <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700">
+                      <div className="flex items-start space-x-4">
+                        <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center flex-shrink-0">
+                          <span className="text-black font-semibold text-sm">3</span>
+                        </div>
+                        <div>
+                          <h4 className="text-lg font-light text-white mb-2">Auto-Repay with Yield</h4>
+                          <p className="text-gray-400 font-light text-sm">Your loan automatically repays itself using yield from the vault</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Key Benefits */}
+                    <div className="bg-gray-800/30 p-6 rounded-2xl border border-gray-700">
+                      <h4 className="text-lg font-light mb-4 text-white">Key Benefits</h4>
+                      <div className="space-y-3 text-sm">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                          <span className="text-gray-400 font-light">No manual repayments required</span>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                          <span className="text-gray-400 font-light">Yield automatically reduces debt</span>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                          <span className="text-gray-400 font-light">Keep earning on your collateral</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div>
-              <Label htmlFor="borrow-amount">USDC Amount to Borrow</Label>
-              <Input
-                id="borrow-amount"
-                type="number"
-                value={borrowAmount}
-                onChange={(e) => setBorrowAmount(e.target.value)}
-                placeholder="Enter USDC amount"
-              />
-            </div>
-            <div className="text-sm text-gray-600">
-              <p>• Maximum LTV: 50% (you can borrow up to 50% of your collateral's value)</p>
-              <p>• Collateral value: {parseInt(rlpCollateral) * 10} USDC (rLP price: $10)</p>
-              <p>• Maximum borrowable: {Math.floor(parseInt(rlpCollateral) * 10 * 0.5)} USDC</p>
-            </div>
-            <Button 
-              onClick={handleDepositAndBorrow} 
-              className="w-full"
-              disabled={isBorrowing || !rlpCollateral || !borrowAmount || 
-                       parseFloat(rlpCollateral) <= 0 || parseFloat(borrowAmount) <= 0}
-            >
-              {isBorrowing ? 'Processing...' : 'Deposit Collateral & Borrow USDC'}
-            </Button>
           </div>
-        </Card>
-      )}
+        )}
 
-      {/* Current Debt Display */}
-      {connected && (
-        <Card className="p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4">Your Loan Status</h2>
-          {isLoading ? (
-            <div className="text-center py-4">
-              <div className="text-gray-500">Loading loan data...</div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-lg font-medium">Current Debt:</span>
-                <span className="text-3xl font-bold text-red-600">
-                  {currentDebt.toFixed(2)} USDC
-                </span>
+        {/* Auto-Repay Section */}
+        {connected && currentDebt > 0 && (
+          <div className="max-w-4xl mx-auto mt-16">
+            <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 backdrop-blur-2xl border border-green-500/20 rounded-3xl p-12">
+              <div className="text-center mb-8">
+                <h2 className="text-4xl font-light text-white mb-4">✨ Auto-Repay with Yield</h2>
+                <p className="text-gray-400 font-light text-lg">Watch your debt decrease automatically</p>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-lg font-medium">Locked Collateral:</span>
-                <span className="text-xl font-semibold text-blue-600">
-                  {lockedCollateral.toFixed(2)} rLP
-                </span>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div className="bg-gray-900/50 p-6 rounded-2xl text-center">
+                  <div className="text-2xl font-light text-red-400 mb-2">Current Debt</div>
+                  <div className="text-3xl font-light text-white">{currentDebt.toFixed(2)} USDC</div>
+                </div>
+                <div className="bg-gray-900/50 p-6 rounded-2xl text-center">
+                  <div className="text-2xl font-light text-green-400 mb-2">Available Yield</div>
+                  <div className="text-3xl font-light text-white">{pendingYield.toFixed(2)} USDC</div>
+                </div>
+                <div className="bg-gray-900/50 p-6 rounded-2xl text-center">
+                  <div className="text-2xl font-light text-blue-400 mb-2">New Debt</div>
+                  <div className="text-3xl font-light text-white">{Math.max(0, currentDebt - pendingYield).toFixed(2)} USDC</div>
+                </div>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-lg font-medium">Pending Yield:</span>
-                <span className="text-xl font-semibold text-green-600">
-                  {pendingYield.toFixed(2)} USDC
-                </span>
-              </div>
-              <div className="text-sm text-gray-600 mt-4">
-                Your loan will automatically repay itself using yield from the Revolv Vault
-              </div>
-            </div>
-          )}
-        </Card>
-      )}
 
-      {/* Repay with Yield Button - THE "WOW" MOMENT */}
-      {connected && currentDebt > 0 && (
-        <Card className="p-6 border-2 border-green-200 bg-green-50">
-          <h2 className="text-xl font-semibold mb-4 text-green-800">✨ Auto-Repay with Yield</h2>
-          <div className="space-y-4">
-            <div className="bg-green-100 p-4 rounded-lg">
-              <p className="text-green-800 font-medium mb-2">
-                🎯 This is the magic moment! Watch your debt decrease in real-time:
-              </p>
-              <ul className="text-green-700 text-sm space-y-1">
-                <li>• Current debt: <span className="font-bold">{currentDebt.toFixed(2)} USDC</span></li>
-                <li>• Available yield: <span className="font-bold">{pendingYield.toFixed(2)} USDC</span></li>
-                <li>• New debt after repayment: <span className="font-bold">{Math.max(0, currentDebt - pendingYield).toFixed(2)} USDC</span></li>
-              </ul>
-            </div>
-            <Button 
-              onClick={handleHarvestAndRepay} 
-              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 text-lg"
-              disabled={isRepaying}
-            >
-              {isRepaying ? '🔄 Processing...' : '🚀 Repay with Yield'}
-            </Button>
-            {isRepaying && (
-              <div className="text-center text-green-600 font-medium">
-                ✨ Harvesting yield and reducing your debt...
+              <div className="text-center">
+                <Button 
+                  onClick={handleHarvestAndRepay} 
+                  className="bg-white text-black hover:bg-gray-100 px-12 py-4 rounded-2xl font-light text-xl transition-all duration-200"
+                  disabled={isRepaying}
+                >
+                  {isRepaying ? (
+                    <div className="flex items-center space-x-3">
+                      <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                      <span>Processing...</span>
+                    </div>
+                  ) : (
+                    '🚀 Repay with Yield'
+                  )}
+                </Button>
               </div>
-            )}
+            </div>
           </div>
-        </Card>
-      )}
+        )}
 
-      {/* Withdraw Collateral */}
-      {connected && currentDebt === 0 && (
-        <Card className="p-6">
-          <h2 className="text-xl font-semibold mb-4">Withdraw Collateral</h2>
-          <div className="space-y-4">
-            <p className="text-gray-600">
-              Your debt is fully repaid! You can now withdraw your rLP collateral.
-            </p>
-            <Button className="w-full">
-              Withdraw rLP Tokens
-            </Button>
+        {/* Withdraw Collateral */}
+        {connected && currentDebt === 0 && lockedCollateral > 0 && (
+          <div className="max-w-2xl mx-auto mt-16">
+            <div className="bg-gray-900/40 backdrop-blur-2xl border border-gray-800 rounded-3xl p-8 text-center">
+              <h2 className="text-2xl font-light text-white mb-4">Withdraw Collateral</h2>
+              <p className="text-gray-400 font-light mb-6">Your debt is fully repaid! You can now withdraw your rLP collateral.</p>
+              <Button className="bg-white text-black hover:bg-gray-100 px-8 py-3 rounded-2xl font-light">
+                Withdraw rLP Tokens
+              </Button>
+            </div>
           </div>
-        </Card>
-      )}
+        )}
+      </div>
     </div>
   );
 };

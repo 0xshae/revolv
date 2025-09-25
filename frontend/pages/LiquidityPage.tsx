@@ -1,18 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '../components/ui/button';
-import { Card } from '../components/ui/card';
 import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
 import { useWallet, InputTransactionData } from '@aptos-labs/wallet-adapter-react';
 import { aptosClient } from '../utils/aptosClient';
 import { MODULE_ADDRESS } from '../constants';
 import { useToast } from '../components/ui/use-toast';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '../components/ui/dropdown-menu';
 
 interface LiquidityPageProps {
   account: any;
@@ -21,18 +13,15 @@ interface LiquidityPageProps {
 const LiquidityPage: React.FC<LiquidityPageProps> = ({ account }) => {
   const { connected, signAndSubmitTransaction } = useWallet();
   const { toast } = useToast();
-  const [depositAmount, setDepositAmount] = useState('');
-  const [selectedToken, setSelectedToken] = useState('APT');
   const [rlpBalance, setRlpBalance] = useState(0);
-  const [treasuryBalances, setTreasuryBalances] = useState<{[key: string]: number}>({});
   const [isDepositing, setIsDepositing] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
 
   // New state for mechanism explanation UI
   const [aptAmount, setAptAmount] = useState('');
   const [rlpAmount, setRlpAmount] = useState(0);
+  const [selectedToken] = useState('APT');
   const [vaultStats, setVaultStats] = useState({
     tvl: 0,
     rlpSupply: 0,
@@ -185,8 +174,9 @@ const LiquidityPage: React.FC<LiquidityPageProps> = ({ account }) => {
       }
       
       toast({
-        title: "Success",
-        description: "Modules initialized successfully!",
+        title: "🎉 Modules Initialized Successfully!",
+        description: "Oracle, Vault, and Auto Loan Vault modules are now active. Demo pool initialized with APT, USDC, and SUI. You can now start depositing and earning yield!",
+        duration: 0, // Persistent notification
       });
       
       setIsInitialized(true);
@@ -238,6 +228,16 @@ const LiquidityPage: React.FC<LiquidityPageProps> = ({ account }) => {
 
     setIsDepositing(true);
     
+    // Show transaction initiation notification
+    const depositValue = calculateDepositValue(aptAmount, 'APT');
+    const estimatedRlp = calculateRlpAmount(depositValue);
+    
+    toast({
+      title: "🔄 Transaction Initiated",
+      description: `Depositing ${aptAmount} APT ($${depositValue.toFixed(2)}) to receive ~${estimatedRlp.toFixed(4)} rLP tokens`,
+      duration: 0, // Persistent notification
+    });
+    
     try {
       // Get token decimals for conversion
       const token = availableTokens.find(t => t.symbol === selectedToken);
@@ -245,13 +245,13 @@ const LiquidityPage: React.FC<LiquidityPageProps> = ({ account }) => {
       const amountInSmallestUnit = Math.floor(parseFloat(aptAmount) * Math.pow(10, decimals));
       
       // Choose the correct deposit function based on selected token
-      let functionName = '';
+      let functionName: `${string}::${string}::${string}`;
       if (selectedToken === 'APT') {
-        functionName = `${MODULE_ADDRESS}::revolv_vault::deposit_apt`;
+        functionName = `${MODULE_ADDRESS}::revolv_vault::deposit_apt` as `${string}::${string}::${string}`;
       } else if (selectedToken === 'USDC') {
-        functionName = `${MODULE_ADDRESS}::revolv_vault::deposit_usdc`;
+        functionName = `${MODULE_ADDRESS}::revolv_vault::deposit_usdc` as `${string}::${string}::${string}`;
       } else if (selectedToken === 'SUI') {
-        functionName = `${MODULE_ADDRESS}::revolv_vault::deposit_sui`;
+        functionName = `${MODULE_ADDRESS}::revolv_vault::deposit_sui` as `${string}::${string}::${string}`;
       } else {
         throw new Error('Unsupported token');
       }
@@ -266,9 +266,11 @@ const LiquidityPage: React.FC<LiquidityPageProps> = ({ account }) => {
 
       const response = await signAndSubmitTransaction(transaction);
       
+      // Show success notification with detailed explanation
       toast({
-        title: "Success",
-        description: `${selectedToken} deposit transaction submitted! Hash: ${response.hash}`,
+        title: "✅ Deposit Successful!",
+        description: `Successfully deposited ${aptAmount} APT and received ${estimatedRlp.toFixed(4)} rLP tokens. Your deposit increased the vault's TVL by $${depositValue.toFixed(2)} and you now own ${((estimatedRlp / (vaultStats.rlpSupply + estimatedRlp)) * 100).toFixed(2)}% of the pool. Transaction: ${response.hash.slice(0, 8)}...`,
+        duration: 0, // Persistent notification
       });
 
       // Clear the input and refresh data
@@ -294,8 +296,9 @@ const LiquidityPage: React.FC<LiquidityPageProps> = ({ account }) => {
       
       toast({
         variant: "destructive",
-        title: "Deposit Failed",
+        title: "❌ Deposit Failed",
         description: errorMessage,
+        duration: 0, // Persistent notification
       });
     } finally {
       setIsDepositing(false);
@@ -459,12 +462,6 @@ const LiquidityPage: React.FC<LiquidityPageProps> = ({ account }) => {
     }
   };
 
-  // Mock pie chart data
-  const pieChartData = Object.entries(treasuryBalances).map(([asset, amount]) => ({
-    asset,
-    amount,
-    percentage: (amount / Object.values(treasuryBalances).reduce((a, b) => a + b, 0)) * 100
-  }));
 
   useEffect(() => {
     if (connected && account) {
@@ -490,238 +487,306 @@ const LiquidityPage: React.FC<LiquidityPageProps> = ({ account }) => {
   }, [aptAmount, vaultStats.tvl, vaultStats.rlpSupply]);
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
-      <h1 className="text-3xl font-bold mb-6">Revolv Liquidity Vault</h1>
-      
-      {/* Wallet Connection Status */}
-      <Card className="p-6 mb-6">
-        <h2 className="text-xl font-semibold mb-4">Wallet Status</h2>
-        {!connected ? (
-          <div className="text-orange-600 font-medium">
-            ⚠️ Please connect your wallet using the button in the header
-          </div>
-        ) : (
-          <div className="text-green-600 font-medium">
-            ✅ Wallet Connected: {account?.address?.toStringLong()?.slice(0, 8)}...
-          </div>
-        )}
-      </Card>
+    <div className="min-h-screen bg-black">
+      <div className="container mx-auto px-6 py-12 max-w-7xl">
+        {/* Header */}
+        <div className="text-center mb-16">
+          <h1 className="text-6xl font-light tracking-tight text-white mb-4">
+            Revolv
+          </h1>
+          <p className="text-xl text-gray-400 font-light tracking-wide">Liquidity Vault</p>
+          <div className="mt-6 h-px bg-gradient-to-r from-transparent via-gray-600 to-transparent"></div>
+        </div>
 
-      {/* Initialization Interface */}
-      {connected && !isInitialized && (
-        <Card className="p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4">Initialize Modules</h2>
-          <div className="space-y-4">
-            <div className="text-orange-600 font-medium">
-              ⚠️ Modules need to be initialized before you can deposit. This is a one-time setup.
-            </div>
-            <Button 
-              onClick={initializeModules} 
-              className="w-full"
-              disabled={isInitializing}
-            >
-              {isInitializing ? 'Initializing...' : 'Initialize Oracle & Vault Modules'}
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      {/* Main Mechanism Explanation UI */}
-      {connected && isInitialized && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Side: Deposit Card */}
-          <Card className="p-6">
-            <h2 className="text-2xl font-semibold mb-6">Deposit into the Revolv Vault</h2>
-            
-            {/* Input Section */}
-            <div className="mb-6">
-              <div className="flex items-center space-x-3 mb-4">
-                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">A</span>
+        {/* Initialization Interface */}
+        {connected && !isInitialized && (
+          <div className="max-w-2xl mx-auto mb-16">
+            <div className="bg-gray-900/50 backdrop-blur-xl border border-gray-800 rounded-2xl p-8">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
                 </div>
-                <span className="text-lg font-medium">APT</span>
-              </div>
-              
-              <div className="relative">
-                <Input
-                  type="number"
-                  value={aptAmount}
-                  onChange={(e) => setAptAmount(e.target.value)}
-                  placeholder="0.0"
-                  className="text-2xl h-16 pl-4 pr-20"
-                />
-                <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-500">
-                  APT
-                </div>
-              </div>
-              
-              <div className="flex justify-between items-center mt-2 text-sm text-gray-600">
-                <span>Balance: {userAptBalance.toFixed(4)} APT</span>
+                <h2 className="text-2xl font-light text-white mb-4">Initialize Protocol</h2>
+                <p className="text-gray-400 mb-8 font-light">One-time setup to activate the liquidity vault</p>
                 <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => setAptAmount(userAptBalance.toString())}
+                  onClick={initializeModules} 
+                  className="bg-white text-black hover:bg-gray-100 px-8 py-3 rounded-full font-medium transition-all duration-200"
+                  disabled={isInitializing}
                 >
-                  Max
+                  {isInitializing ? (
+                    <div className="flex items-center space-x-2">
+                      <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                      <span>Initializing...</span>
+                    </div>
+                  ) : (
+                    'Initialize Protocol'
+                  )}
                 </Button>
               </div>
             </div>
+          </div>
+        )}
 
-            {/* Arrow */}
-            <div className="flex justify-center mb-6">
-              <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-                <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                </svg>
-              </div>
+        {/* TVL and Yield Stats */}
+        {connected && isInitialized && (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-20">
+            <div className="bg-gray-900/30 backdrop-blur-xl border border-gray-800 rounded-xl p-6 text-center">
+              <div className="text-3xl font-light text-white mb-2">${vaultStats.tvl.toFixed(0)}</div>
+              <div className="text-sm text-gray-500 font-light tracking-wide uppercase">Total Value Locked</div>
             </div>
+            <div className="bg-gray-900/30 backdrop-blur-xl border border-gray-800 rounded-xl p-6 text-center">
+              <div className="text-3xl font-light text-green-400 mb-2">12.5%</div>
+              <div className="text-sm text-gray-500 font-light tracking-wide uppercase">APY</div>
+            </div>
+            <div className="bg-gray-900/30 backdrop-blur-xl border border-gray-800 rounded-xl p-6 text-center">
+              <div className="text-3xl font-light text-white mb-2">{vaultStats.rlpSupply.toFixed(0)}</div>
+              <div className="text-sm text-gray-500 font-light tracking-wide uppercase">rLP Supply</div>
+            </div>
+            <div className="bg-gray-900/30 backdrop-blur-xl border border-gray-800 rounded-xl p-6 text-center">
+              <div className="text-3xl font-light text-white mb-2">${calculateRlpPrice(vaultStats.tvl, vaultStats.rlpSupply).toFixed(2)}</div>
+              <div className="text-sm text-gray-500 font-light tracking-wide uppercase">rLP Price</div>
+            </div>
+          </div>
+        )}
 
-            {/* Output Section */}
-            <div className="mb-6">
-              <h3 className="text-lg font-medium mb-4">You Will Receive (Estimated)</h3>
-              <div className="flex items-center space-x-3 mb-4">
-                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">r</span>
-                </div>
-                <span className="text-lg font-medium">rLP</span>
+        {/* Main Deposit Interface - Centered */}
+        {connected && isInitialized && (
+          <div className="max-w-6xl mx-auto">
+            <div className="bg-gray-900/40 backdrop-blur-2xl border border-gray-800 rounded-3xl p-12">
+              <div className="text-center mb-12">
+                <h2 className="text-4xl font-light text-white mb-4">Deposit</h2>
+                <p className="text-gray-400 font-light text-lg">Earn yield on your multi-token deposits</p>
               </div>
               
-              <div className="relative">
-                <Input
-                  type="text"
-                  value={rlpAmount.toFixed(6)}
-                  readOnly
-                  className="text-2xl h-16 pl-4 pr-20 bg-gray-50"
-                />
-                <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-500">
-                  rLP
-                </div>
-              </div>
-            </div>
-
-            {/* Transaction Details */}
-            <div className="bg-gray-50 p-4 rounded-lg mb-6 text-sm text-gray-600">
-              <div className="flex justify-between mb-2">
-                <span>Price:</span>
-                <span>1 APT = {(rlpAmount / (parseFloat(aptAmount) || 1)).toFixed(4)} rLP (${oraclePrices.APT.toFixed(2)})</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Slippage Tolerance:</span>
-                <span>0.5%</span>
-              </div>
-            </div>
-
-            {/* Call to Action Button */}
-            <Button 
-              onClick={handleDeposit} 
-              className="w-full h-12 text-lg"
-              disabled={isDepositing || !aptAmount || parseFloat(aptAmount) <= 0}
-            >
-              {isDepositing ? 'Processing...' : 'Deposit APT'}
-            </Button>
-          </Card>
-
-          {/* Right Side: Mechanism Explained Card */}
-          <Card className="p-6">
-            <h2 className="text-2xl font-semibold mb-6">How It Works</h2>
-            
-            {/* Before vs After Comparison */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              {/* Before Column */}
-              <div>
-                <h3 className="text-lg font-medium mb-4 text-gray-700">Vault State Before</h3>
-                <div className="space-y-3">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
+                {/* Left: Deposit Interface */}
+                <div className="space-y-8">
+                  {/* Input Section */}
                   <div>
-                    <div className="text-sm text-gray-600">Total Value Locked (TVL)</div>
-                    <div className="text-lg font-semibold">${vaultStats.tvl.toFixed(2)}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-gray-600">Total rLP Supply</div>
-                    <div className="text-lg font-semibold">{vaultStats.rlpSupply.toFixed(2)} rLP</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* After Column */}
-              <div>
-                <h3 className="text-lg font-medium mb-4 text-gray-700">Vault State After Your Deposit</h3>
-                <div className="space-y-3">
-                  <div>
-                    <div className="text-sm text-gray-600">Previous TVL</div>
-                    <div className="text-lg font-semibold">${vaultStats.tvl.toFixed(2)}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-gray-600">+ Your Deposit</div>
-                    <div className="text-lg font-semibold text-green-600">
-                      + ${calculateDepositValue(aptAmount, 'APT').toFixed(2)}
+                    <div className="flex items-center space-x-4 mb-6">
+                      <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center">
+                        <span className="text-black font-semibold text-xl">A</span>
+                      </div>
+                      <span className="text-2xl font-light text-white">APT</span>
+                    </div>
+                    
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        value={aptAmount}
+                        onChange={(e) => setAptAmount(e.target.value)}
+                        placeholder="0.0"
+                        className="text-3xl h-20 pl-6 pr-24 bg-black/50 border-gray-800 text-white placeholder-gray-600 rounded-2xl font-light"
+                      />
+                      <div className="absolute right-6 top-1/2 transform -translate-y-1/2 text-gray-500 text-lg font-light">
+                        APT
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-between items-center mt-4 text-sm text-gray-500">
+                      <span className="font-light">Balance: {userAptBalance.toFixed(4)} APT</span>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setAptAmount(userAptBalance.toString())}
+                        className="border-gray-700 text-gray-300 hover:bg-gray-800 rounded-full px-4 py-2 font-light"
+                      >
+                        Max
+                      </Button>
                     </div>
                   </div>
-                  <div className="border-t pt-2">
-                    <div className="text-sm text-gray-600">= New TVL</div>
-                    <div className="text-lg font-semibold">
-                      ${(vaultStats.tvl + calculateDepositValue(aptAmount, 'APT')).toFixed(2)}
+
+                  {/* Arrow */}
+                  <div className="flex justify-center">
+                    <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center">
+                      <svg className="w-6 h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                      </svg>
+                    </div>
+                  </div>
+
+                  {/* Output Section */}
+                  <div>
+                    <h3 className="text-xl font-light mb-6 text-white">You Will Receive</h3>
+                    <div className="flex items-center space-x-4 mb-6">
+                      <div className="w-12 h-12 bg-gradient-to-r from-green-400 to-emerald-400 rounded-2xl flex items-center justify-center">
+                        <span className="text-white font-semibold text-xl">r</span>
+                      </div>
+                      <span className="text-2xl font-light text-white">rLP</span>
+                    </div>
+                    
+                    <div className="relative">
+                      <Input
+                        type="text"
+                        value={rlpAmount.toFixed(6)}
+                        readOnly
+                        className="text-3xl h-20 pl-6 pr-24 bg-black/30 border-gray-800 text-white rounded-2xl font-light"
+                      />
+                      <div className="absolute right-6 top-1/2 transform -translate-y-1/2 text-gray-500 text-lg font-light">
+                        rLP
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Yield Information */}
+                  <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700">
+                    <h4 className="text-lg font-light text-white mb-4">Expected Yield</h4>
+                    <div className="space-y-3 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 font-light">APY</span>
+                        <span className="text-green-400 font-light">12.5%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 font-light">Daily Yield</span>
+                        <span className="text-green-400 font-light">0.034%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 font-light">Your Estimated Daily</span>
+                        <span className="text-green-400 font-light">
+                          ${(rlpAmount * 0.00034).toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Transaction Details */}
+                  <div className="bg-gray-800/30 p-6 rounded-2xl text-sm text-gray-400">
+                    <div className="flex justify-between mb-3">
+                      <span className="font-light">Price</span>
+                      <span className="font-light">1 APT = {(rlpAmount / (parseFloat(aptAmount) || 1)).toFixed(4)} rLP (${oraclePrices.APT.toFixed(2)})</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-light">Slippage Tolerance</span>
+                      <span className="font-light">0.5%</span>
+                    </div>
+                  </div>
+
+                  {/* Call to Action Button */}
+                  <Button 
+                    onClick={handleDeposit} 
+                    className="w-full h-16 text-xl bg-white text-black hover:bg-gray-100 rounded-2xl font-light transition-all duration-200"
+                    disabled={isDepositing || !aptAmount || parseFloat(aptAmount) <= 0}
+                  >
+                    {isDepositing ? (
+                      <div className="flex items-center space-x-3">
+                        <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                        <span>Processing...</span>
+                      </div>
+                    ) : (
+                      'Deposit APT'
+                    )}
+                  </Button>
+                </div>
+
+                {/* Right: How It Works */}
+                <div className="space-y-8">
+                  <h3 className="text-3xl font-light text-white mb-8">How It Works</h3>
+                  
+                  {/* Before vs After Comparison */}
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700">
+                        <h4 className="text-sm font-light text-gray-400 mb-4 uppercase tracking-wide">Before Your Deposit</h4>
+                        <div className="space-y-4">
+                          <div>
+                            <div className="text-xs text-gray-500 font-light uppercase tracking-wide">TVL</div>
+                            <div className="text-xl font-light text-white">${vaultStats.tvl.toFixed(2)}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-gray-500 font-light uppercase tracking-wide">rLP Supply</div>
+                            <div className="text-xl font-light text-white">{vaultStats.rlpSupply.toFixed(2)}</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700">
+                        <h4 className="text-sm font-light text-gray-400 mb-4 uppercase tracking-wide">After Your Deposit</h4>
+                        <div className="space-y-4">
+                          <div>
+                            <div className="text-xs text-gray-500 font-light uppercase tracking-wide">Previous TVL</div>
+                            <div className="text-sm font-light text-white">${vaultStats.tvl.toFixed(2)}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-gray-500 font-light uppercase tracking-wide">+ Your Deposit</div>
+                            <div className="text-sm font-light text-green-400">+ ${calculateDepositValue(aptAmount, 'APT').toFixed(2)}</div>
+                          </div>
+                          <div className="border-t border-gray-700 pt-4">
+                            <div className="text-xs text-gray-500 font-light uppercase tracking-wide">= New TVL</div>
+                            <div className="text-xl font-light text-white">
+                              ${(vaultStats.tvl + calculateDepositValue(aptAmount, 'APT')).toFixed(2)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* rLP Supply Changes */}
+                    <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700">
+                      <h4 className="text-sm font-light text-gray-400 mb-4 uppercase tracking-wide">rLP Token Changes</h4>
+                      <div className="space-y-4">
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-400 font-light">Previous Supply</span>
+                          <span className="text-sm font-light text-white">{vaultStats.rlpSupply.toFixed(2)} rLP</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-400 font-light">+ You Receive</span>
+                          <span className="text-sm font-light text-green-400">+ {rlpAmount.toFixed(2)} rLP</span>
+                        </div>
+                        <div className="border-t border-gray-700 pt-4 flex justify-between">
+                          <span className="text-sm text-gray-400 font-light">= New Supply</span>
+                          <span className="text-sm font-light text-white">
+                            {(vaultStats.rlpSupply + rlpAmount).toFixed(2)} rLP
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Key Takeaway */}
+                    <div className="bg-gray-800/30 p-6 rounded-2xl border border-gray-700">
+                      <h4 className="text-lg font-light mb-4 text-white">Price Stability Guaranteed</h4>
+                      <div className="space-y-3 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-400 font-light">Price Before</span>
+                          <span className="text-white font-light">${calculateRlpPrice(vaultStats.tvl, vaultStats.rlpSupply).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400 font-light">Price After</span>
+                          <span className="text-green-400 font-light">
+                            ${calculateRlpPrice(
+                              vaultStats.tvl + calculateDepositValue(aptAmount, 'APT'), 
+                              vaultStats.rlpSupply + rlpAmount
+                            ).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="mt-4 text-xs text-gray-500 font-light">
+                        ✓ No dilution of existing holders' value
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-
-            {/* Separator */}
-            <div className="border-t my-6"></div>
-
-            {/* rLP Supply Changes */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div>
-                <div className="text-sm text-gray-600">Previous rLP Supply</div>
-                <div className="text-lg font-semibold">{vaultStats.rlpSupply.toFixed(2)} rLP</div>
-              </div>
-              <div>
-                <div className="text-sm text-gray-600">+ You Will Receive</div>
-                <div className="text-lg font-semibold text-green-600">+ {rlpAmount.toFixed(2)} rLP</div>
-              </div>
-            </div>
-            <div className="border-t pt-2 mb-6">
-              <div className="text-sm text-gray-600">= New rLP Supply</div>
-              <div className="text-lg font-semibold">
-                {(vaultStats.rlpSupply + rlpAmount).toFixed(2)} rLP
-              </div>
-            </div>
-
-            {/* Key Takeaway */}
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <h3 className="text-lg font-semibold mb-3 text-blue-800">The rLP Token Price Remains Stable</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Price Before Deposit:</span>
-                  <span className="font-semibold">${calculateRlpPrice(vaultStats.tvl, vaultStats.rlpSupply).toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Price After Deposit:</span>
-                  <span className="font-semibold text-green-600">
-                    ${calculateRlpPrice(
-                      vaultStats.tvl + calculateDepositValue(aptAmount, 'APT'), 
-                      vaultStats.rlpSupply + rlpAmount
-                    ).toFixed(2)}
-                  </span>
-                </div>
-              </div>
-              <div className="mt-3 text-xs text-blue-700">
-                This proves your deposit doesn't dilute existing holders' value
-              </div>
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {/* Your rLP Balance */}
-      {connected && isInitialized && (
-        <Card className="p-6 mt-6">
-          <h2 className="text-xl font-semibold mb-4">Your rLP Token Balance</h2>
-          <div className="text-2xl font-bold text-blue-600">
-            {rlpBalance.toFixed(6)} rLP
           </div>
-        </Card>
-      )}
+        )}
+
+        {/* Your rLP Balance */}
+        {connected && isInitialized && (
+          <div className="max-w-2xl mx-auto mt-16">
+            <div className="bg-gray-900/40 backdrop-blur-2xl border border-gray-800 rounded-3xl p-8 text-center">
+              <h2 className="text-2xl font-light text-white mb-4">Your rLP Token Balance</h2>
+              <div className="text-4xl font-light text-white mb-2">
+                {rlpBalance.toFixed(6)} rLP
+              </div>
+              <div className="text-gray-400 font-light">
+                Estimated Value: ${(rlpBalance * calculateRlpPrice(vaultStats.tvl, vaultStats.rlpSupply)).toFixed(2)}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

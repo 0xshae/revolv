@@ -19,24 +19,31 @@ function App() {
   const [currentPage, setCurrentPage] = useState<'liquidity' | 'auto-loan'>('liquidity');
 
   return (
-    <>
-      <TopBanner />
+    <div className="min-h-screen bg-black">
       <Header />
       
       {/* Navigation */}
-      <div className="flex justify-center mb-6">
-        <div className="flex space-x-2 bg-gray-100 p-1 rounded-lg">
+      <div className="flex justify-center mb-8 pt-8">
+        <div className="flex space-x-1 bg-gray-900/50 backdrop-blur-xl border border-gray-800 p-1 rounded-2xl">
           <Button
             variant={currentPage === 'liquidity' ? 'default' : 'ghost'}
             onClick={() => setCurrentPage('liquidity')}
-            className="px-6"
+            className={`px-8 py-3 rounded-xl font-light transition-all duration-200 ${
+              currentPage === 'liquidity' 
+                ? 'bg-white text-black hover:bg-gray-100' 
+                : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+            }`}
           >
             Provide Liquidity
           </Button>
           <Button
             variant={currentPage === 'auto-loan' ? 'default' : 'ghost'}
             onClick={() => setCurrentPage('auto-loan')}
-            className="px-6"
+            className={`px-8 py-3 rounded-xl font-light transition-all duration-200 ${
+              currentPage === 'auto-loan' 
+                ? 'bg-white text-black hover:bg-gray-100' 
+                : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+            }`}
           >
             Auto-Loan
           </Button>
@@ -64,7 +71,7 @@ function App() {
           </Card>
         </div>
       )}
-    </>
+    </div>
   );
 }
 
