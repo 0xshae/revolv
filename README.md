@@ -1,8 +1,10 @@
-# 🚀 Revolv - Multi-Token Liquidity Vault with Auto-Loan Protocol
+# Revolv - Self-Repaying Loans on Aptos, backed by the safety of a diversified liquidity pool
 
 A revolutionary DeFi protocol built on Aptos that combines multi-token liquidity provision with automated lending mechanisms. Users can deposit various tokens (APT, USDC, SUI) into a unified vault, receive rLP tokens, and use them as collateral for automated loans with yield-based repayment.
 
-## 🌟 Key Features
+# Pitch Deck - https://www.canva.com/design/DAGz7nyJg7w/0MXdjse9g2O-fBJw8wSWhQ/edit?utm_content=DAGz7nyJg7w&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton
+
+## Key Features
 
 - **Multi-Token Liquidity Pool**: Deposit APT, USDC, and SUI into a unified vault
 - **Proportional LP Token Minting**: Receive rLP tokens based on your contribution to the pool
@@ -10,9 +12,8 @@ A revolutionary DeFi protocol built on Aptos that combines multi-token liquidity
 - **Yield-Based Auto-Repayment**: Loans automatically repay using generated yield
 - **Real-Time Price Oracle**: Dynamic pricing for accurate LTV calculations
 - **Token Whitelisting**: Secure token management with admin controls
-- **Modern Web3 UI**: Sleek, dark-themed interface with real-time updates
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 ### Core Modules
 
@@ -26,7 +27,7 @@ A revolutionary DeFi protocol built on Aptos that combines multi-token liquidity
 0x18ba7f5a68dc720fd3833fa9c2402e22ab899301424c87d41461fa7aa2415a5e
 ```
 
-## 🔧 How It Works
+## How It Works
 
 ### 1. Liquidity Provision
 - Users deposit tokens (APT/USDC/SUI) into the vault
@@ -46,7 +47,7 @@ A revolutionary DeFi protocol built on Aptos that combines multi-token liquidity
 - Yield automatically reduces outstanding debt
 - Collateral remains locked until debt is fully repaid
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - Node.js 18+ 
@@ -85,7 +86,7 @@ npm run dev
 5. **Open your browser**
 Navigate to `http://localhost:5173`
 
-## 📦 Deployment
+## Deployment
 
 ### Smart Contract Deployment
 
@@ -116,7 +117,7 @@ npm run build
 npm run deploy
 ```
 
-## 🎯 Usage Guide
+## Usage Guide
 
 ### Providing Liquidity
 
@@ -142,7 +143,7 @@ npm run deploy
 3. **Yield automatically reduces** your outstanding debt
 4. **Withdraw collateral** once debt reaches zero
 
-## 🔍 Smart Contract Functions
+## Smart Contract Functions
 
 ### revolv_vault.move
 
@@ -179,7 +180,7 @@ npm run deploy
 - **`initialize(account)`** - Initialize the oracle module
 - **`get_price(coin_type)`** - Get price for specified token type
 
-## 🛡️ Security Features
+## Security Features
 
 - **Token Whitelisting**: Only approved tokens can be deposited
 - **LTV Enforcement**: Maximum 50% loan-to-value ratio
@@ -187,7 +188,7 @@ npm run deploy
 - **Input Validation**: Comprehensive parameter validation
 - **State Management**: Proper resource initialization checks
 
-## 🎨 Frontend Features
+## Frontend Features
 
 - **Real-Time Updates**: Live data synchronization across pages
 - **Transaction Tracking**: Clickable transaction hashes to Aptos explorer
@@ -196,7 +197,7 @@ npm run deploy
 - **Error Handling**: Comprehensive error messages and validation
 - **Cross-Page Sync**: Automatic data refresh between liquidity and loan pages
 
-## 🔧 Technical Stack
+## Technical Stack
 
 ### Smart Contracts
 - **Move Language**: Aptos native smart contract language
@@ -215,7 +216,7 @@ npm run deploy
 - **ESLint**: Code quality and consistency
 - **Prettier**: Code formatting
 
-## 🐛 Known Issues
+## Known Issues
 
 ### Smart Contract
 - **Module Name Clash**: Occurs when trying to update existing modules (requires new deployment)
@@ -232,7 +233,7 @@ npm run deploy
 - **Wallet Compatibility**: Limited to Aptos-compatible wallets
 - **Gas Estimation**: No gas estimation for transactions (users see actual gas costs after execution)
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -240,11 +241,11 @@ npm run deploy
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📄 License
+## License
 
 This project is licensed under the Apache-2.0 License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Aptos Labs for the excellent blockchain infrastructure
 - Move language community for documentation and examples
