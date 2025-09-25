@@ -270,15 +270,52 @@ const LiquidityPage: React.FC<LiquidityPageProps> = ({ account }) => {
       // Show success notification with detailed explanation
       toast({
         title: "✅ Deposit Successful!",
-        description: `Successfully deposited ${aptAmount} APT and received ${estimatedRlp.toFixed(4)} rLP tokens. Your deposit increased the vault's TVL by $${depositValue.toFixed(2)} and you now own ${((estimatedRlp / (vaultStats.rlpSupply + estimatedRlp)) * 100).toFixed(2)}% of the pool. Transaction: ${response.hash.slice(0, 8)}...`,
+        description: `Successfully deposited ${aptAmount} APT and received ${estimatedRlp.toFixed(4)} rLP tokens. Your deposit increased the vault's TVL by $${depositValue.toFixed(2)} and you now own ${((estimatedRlp / (vaultStats.rlpSupply + estimatedRlp)) * 100).toFixed(2)}% of the pool.`,
         duration: 0, // Persistent notification
       });
 
+      // Show separate clickable transaction hash notification
+      toast({
+        title: "🔗 View Transaction",
+        description: (
+          <a 
+            href={getExplorerUrl(response.hash)} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-blue-400 hover:text-blue-300 underline font-mono"
+          >
+            {response.hash.slice(0, 8)}...{response.hash.slice(-8)}
+          </a>
+        ),
+        duration: 0, // Persistent notification
+      });
+
+      // IMMEDIATE UI UPDATE - Update the UI state immediately
+      const depositValue = calculateDepositValue(aptAmount, 'APT');
+      const newRlpBalance = rlpBalance + estimatedRlp;
+      const newTvl = vaultStats.tvl + depositValue;
+      const newRlpSupply = vaultStats.rlpSupply + estimatedRlp;
+      
+      // Update UI immediately
+      setRlpBalance(newRlpBalance);
+      setVaultStats(prev => ({
+        ...prev,
+        tvl: newTvl,
+        rlpSupply: newRlpSupply
+      }));
+      
       // Clear the input and refresh data
       setAptAmount('');
+      
+      // Wait for blockchain state to update
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
       await fetchTreasuryBalances();
       await fetchRlpBalance();
       await fetchVaultStats();
+      
+      // Trigger refresh event for other pages
+      window.dispatchEvent(new CustomEvent('refreshLoanData'));
       
     } catch (error: any) {
       console.error('Deposit failed:', error);
@@ -470,6 +507,25 @@ const LiquidityPage: React.FC<LiquidityPageProps> = ({ account }) => {
         fetchUserAptBalance();
       }
     }
+  }, [connected, account, isInitialized]);
+
+  // Listen for refresh events from other pages
+  useEffect(() => {
+    const handleRefresh = () => {
+      console.log('LiquidityPage: Received refresh event, updating data...');
+      if (connected && account && isInitialized) {
+        fetchTreasuryBalances();
+        fetchRlpBalance();
+        fetchVaultStats();
+        fetchUserAptBalance();
+      }
+    };
+
+    window.addEventListener('refreshLiquidityData', handleRefresh);
+    
+    return () => {
+      window.removeEventListener('refreshLiquidityData', handleRefresh);
+    };
   }, [connected, account, isInitialized]);
 
   // Update rLP calculation when user types
@@ -773,7 +829,22 @@ const LiquidityPage: React.FC<LiquidityPageProps> = ({ account }) => {
         {connected && isInitialized && (
           <div className="max-w-2xl mx-auto mt-16">
             <div className="bg-gray-900/40 backdrop-blur-2xl border border-gray-800 rounded-3xl p-8 text-center">
-              <h2 className="text-2xl font-light text-white mb-4">Your rLP Token Balance</h2>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-light text-white">Your rLP Token Balance</h2>
+                <Button 
+                  onClick={async () => {
+                    console.log('FORCE REFRESH: Clearing rLP balance and fetching fresh data...');
+                    setRlpBalance(0);
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    await fetchRlpBalance();
+                    await fetchVaultStats();
+                    await fetchTreasuryBalances();
+                  }}
+                  className="bg-gray-800 text-white hover:bg-gray-700 px-4 py-2 rounded-xl font-light"
+                >
+                  Force Refresh
+                </Button>
+              </div>
               <div className="text-4xl font-light text-white mb-2">
                 {rlpBalance.toFixed(6)} rLP
               </div>

@@ -20,7 +20,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-black">
-      <Header />
+      <Header onNavigateToLiquidity={() => setCurrentPage('liquidity')} />
       
       {/* Navigation */}
       <div className="flex justify-center mb-8 pt-8">

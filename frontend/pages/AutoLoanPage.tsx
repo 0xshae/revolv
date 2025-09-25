@@ -3,7 +3,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { useWallet, InputTransactionData } from '@aptos-labs/wallet-adapter-react';
 import { aptosClient } from '../utils/aptosClient';
-import { MODULE_ADDRESS } from '../constants';
+import { MODULE_ADDRESS, getExplorerUrl } from '../constants';
 import { useToast } from '../components/ui/use-toast';
 
 interface AutoLoanPageProps {
@@ -93,14 +93,48 @@ const AutoLoanPage: React.FC<AutoLoanPageProps> = ({ account }) => {
       
       toast({
         title: "✅ Borrow Successful!",
-        description: `Successfully deposited ${rlpCollateral} rLP as collateral and borrowed ${borrowAmount} USDC. Your loan is now active and will auto-repay using yield. Transaction: ${response.hash.slice(0, 8)}...`,
+        description: `Successfully deposited ${rlpCollateral} rLP as collateral and borrowed ${borrowAmount} USDC. Your loan is now active and will auto-repay using yield.`,
+        duration: 0, // Persistent notification
+      });
+
+      // Show separate clickable transaction hash notification
+      toast({
+        title: "🔗 View Transaction",
+        description: (
+          <a 
+            href={getExplorerUrl(response.hash)} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-blue-400 hover:text-blue-300 underline font-mono"
+          >
+            {response.hash.slice(0, 8)}...{response.hash.slice(-8)}
+          </a>
+        ),
         duration: 0, // Persistent notification
       });
 
       // Clear inputs and refresh data
       setRlpCollateral('');
       setBorrowAmount('');
+      
+      // IMMEDIATE UI UPDATE - Update the UI state immediately
+      const collateralAmountNum = parseFloat(rlpCollateral);
+      const borrowAmountNum = parseFloat(borrowAmount);
+      
+      // Update current debt immediately
+      setCurrentDebt(prev => prev + borrowAmountNum);
+      setLockedCollateral(prev => prev + collateralAmountNum);
+      setUserRlpBalance(prev => prev - collateralAmountNum);
+      
+      // Wait a moment for blockchain state to update
+      console.log('Waiting for blockchain state to update...');
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      console.log('Refreshing data after borrow transaction...');
       await fetchAllData();
+      
+      // Also refresh the main page data by triggering a custom event
+      window.dispatchEvent(new CustomEvent('refreshLiquidityData'));
       
     } catch (error: any) {
       console.error('Borrow failed:', error);
@@ -148,12 +182,42 @@ const AutoLoanPage: React.FC<AutoLoanPageProps> = ({ account }) => {
       
       toast({
         title: "🎉 Auto-Repay Successful!",
-        description: `Yield harvested and debt repaid! Your loan decreased from ${currentDebt.toFixed(2)} to ${Math.max(0, currentDebt - pendingYield).toFixed(2)} USDC. Transaction: ${response.hash.slice(0, 8)}...`,
+        description: `Yield harvested and debt repaid! Your loan decreased from ${currentDebt.toFixed(2)} to ${Math.max(0, currentDebt - pendingYield).toFixed(2)} USDC.`,
         duration: 0, // Persistent notification
       });
 
+      // Show separate clickable transaction hash notification
+      toast({
+        title: "🔗 View Transaction",
+        description: (
+          <a 
+            href={getExplorerUrl(response.hash)} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-blue-400 hover:text-blue-300 underline font-mono"
+          >
+            {response.hash.slice(0, 8)}...{response.hash.slice(-8)}
+          </a>
+        ),
+        duration: 0, // Persistent notification
+      });
+
+      // IMMEDIATE UI UPDATE - Update the UI state immediately
+      const yieldAmount = pendingYield;
+      const newDebt = Math.max(0, currentDebt - yieldAmount);
+      
+      // Update debt immediately
+      setCurrentDebt(newDebt);
+      
       // THE CRITICAL MOMENT: Refresh all data to show the debt decrease
+      console.log('Waiting for blockchain state to update after repay...');
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      console.log('Refreshing data after repay transaction...');
       await fetchAllData();
+      
+      // Also refresh the main page data by triggering a custom event
+      window.dispatchEvent(new CustomEvent('refreshLiquidityData'));
       
       toast({
         title: "✨ Debt Reduced!",
@@ -218,50 +282,94 @@ const AutoLoanPage: React.FC<AutoLoanPageProps> = ({ account }) => {
     }
   };
 
+  // Force refresh function that bypasses all caching
+  const forceRefreshAllData = async () => {
+    console.log('FORCE REFRESH: Clearing all state and fetching fresh data...');
+    
+    // Clear all state first
+    setCurrentDebt(0);
+    setLockedCollateral(0);
+    setPendingYield(0);
+    setUserRlpBalance(0);
+    
+    // Wait a moment
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Fetch fresh data
+    await fetchAllData();
+  };
+
   // Fetch all on-chain data
   const fetchAllData = async () => {
     if (!account?.address || !MODULE_ADDRESS) {
+      console.log('fetchAllData: Missing account or MODULE_ADDRESS');
       return;
     }
 
     try {
+      console.log('fetchAllData: Starting data fetch...');
       setIsLoading(true);
       
       // Fetch user's current debt
+      console.log('fetchAllData: Fetching user debt...');
       const debtResponse = await aptosClient().view({
         payload: {
           function: `${MODULE_ADDRESS}::auto_loan_vault::get_user_debt`,
           functionArguments: [account.address.toStringLong()],
         },
       });
+      console.log('fetchAllData: Debt response:', debtResponse);
       
       // Fetch user's locked collateral
+      console.log('fetchAllData: Fetching user collateral...');
       const collateralResponse = await aptosClient().view({
         payload: {
           function: `${MODULE_ADDRESS}::auto_loan_vault::get_user_collateral`,
           functionArguments: [account.address.toStringLong()],
         },
       });
+      console.log('fetchAllData: Collateral response:', collateralResponse);
       
       // Fetch pending yield from revolv_vault
+      console.log('fetchAllData: Fetching pending yield...');
       const yieldResponse = await aptosClient().view({
         payload: {
           function: `${MODULE_ADDRESS}::revolv_vault::get_pending_yield`,
           functionArguments: [Number(collateralResponse[0]) || 0],
         },
       });
+      console.log('fetchAllData: Yield response:', yieldResponse);
 
       // Convert from octas to readable format
       const debtAmount = debtResponse[0] ? Number(debtResponse[0]) / 1000000 : 0; // USDC has 6 decimals
       const collateralAmount = collateralResponse[0] ? Number(collateralResponse[0]) / 100000000 : 0; // rLP has 8 decimals
       const yieldAmount = yieldResponse[0] ? Number(yieldResponse[0]) / 1000000 : 0; // Yield in dollars
 
+      console.log('fetchAllData: Converted amounts:', { debtAmount, collateralAmount, yieldAmount });
+
       setCurrentDebt(debtAmount);
       setLockedCollateral(collateralAmount);
       setPendingYield(yieldAmount);
 
       // Also fetch user's rLP balance
+      console.log('fetchAllData: Fetching user rLP balance...');
       await fetchUserRlpBalance();
+
+      // Debug: Fetch stored collateral amount
+      try {
+        console.log('fetchAllData: Fetching stored collateral...');
+        const storedCollateralResponse = await aptosClient().view({
+          payload: {
+            function: `${MODULE_ADDRESS}::auto_loan_vault::get_user_stored_collateral`,
+            functionArguments: [account.address.toStringLong()],
+          },
+        });
+        console.log('fetchAllData: Stored collateral response:', storedCollateralResponse);
+        const storedCollateralAmount = storedCollateralResponse[0] ? Number(storedCollateralResponse[0]) / 100000000 : 0;
+        console.log('fetchAllData: Stored collateral amount:', storedCollateralAmount);
+      } catch (error) {
+        console.error('Failed to fetch stored collateral:', error);
+      }
 
     } catch (error) {
       console.error('Failed to fetch auto-loan data:', error);
@@ -287,6 +395,22 @@ const AutoLoanPage: React.FC<AutoLoanPageProps> = ({ account }) => {
     }
   }, [connected, account, MODULE_ADDRESS]);
 
+  // Listen for refresh events from other pages
+  useEffect(() => {
+    const handleRefresh = () => {
+      console.log('AutoLoanPage: Received refresh event, updating data...');
+      if (connected && account && MODULE_ADDRESS) {
+        fetchAllData();
+      }
+    };
+
+    window.addEventListener('refreshLoanData', handleRefresh);
+    
+    return () => {
+      window.removeEventListener('refreshLoanData', handleRefresh);
+    };
+  }, [connected, account, MODULE_ADDRESS]);
+
   return (
     <div className="min-h-screen bg-black">
       <div className="container mx-auto px-6 py-12 max-w-7xl">
@@ -305,11 +429,11 @@ const AutoLoanPage: React.FC<AutoLoanPageProps> = ({ account }) => {
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-light text-white">Your Loan Status</h2>
               <Button 
-                onClick={fetchAllData}
+                onClick={forceRefreshAllData}
                 className="bg-gray-800 text-white hover:bg-gray-700 px-4 py-2 rounded-xl font-light"
                 disabled={isLoading}
               >
-                {isLoading ? 'Refreshing...' : 'Refresh'}
+                {isLoading ? 'Refreshing...' : 'Force Refresh'}
               </Button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
