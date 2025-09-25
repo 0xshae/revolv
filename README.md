@@ -37,7 +37,7 @@ A revolutionary DeFi protocol built on Aptos that combines multi-token liquidity
 - rLP tokens represent ownership share in the multi-token pool
 - Pool generates yield from various DeFi activities
   
-<img width="1005" height="842" alt="image" src="https://github.com/user-attachments/assets/3d9a8951-a6dd-404e-a0d0-ba31f4789a89" />
+<img width="958" height="857" alt="image" src="https://github.com/user-attachments/assets/b9de03dd-5b12-4255-a16a-9e8c322ef738" />
 
 ### 2. Automated Lending
 - Users deposit rLP tokens as collateral
@@ -45,8 +45,10 @@ A revolutionary DeFi protocol built on Aptos that combines multi-token liquidity
 - Protocol enforces 50% Loan-to-Value (LTV) ratio
 - Users can borrow up to 50% of their collateral value in USDC
 
-<img width="1307" height="792" alt="image" src="https://github.com/user-attachments/assets/a9a06999-f006-4c62-bdd9-c79f8d866b45" />
 <img width="1047" height="832" alt="image" src="https://github.com/user-attachments/assets/3101bbe7-40d2-4e59-8edb-1b4c8a08848e" />
+
+<img width="782" height="827" alt="image" src="https://github.com/user-attachments/assets/2881594f-7d63-4270-a421-b0ff8f13542e" />
+
 
 ### 3. Auto-Repayment Mechanism
 - Yield generated from the liquidity pool accumulates
