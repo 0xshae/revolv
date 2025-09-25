@@ -2,7 +2,9 @@
 
 A revolutionary DeFi protocol built on Aptos that combines multi-token liquidity provision with automated lending mechanisms. Users can deposit various tokens (APT, USDC, SUI) into a unified vault, receive rLP tokens, and use them as collateral for automated loans with yield-based repayment.
 
-# Pitch Deck - https://www.canva.com/design/DAGz7nyJg7w/0MXdjse9g2O-fBJw8wSWhQ/edit?utm_content=DAGz7nyJg7w&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton
+<img width="1356" height="790" alt="image" src="https://github.com/user-attachments/assets/14d353eb-6f80-4704-b9f8-7a5f68805b48" />
+
+## Pitch Deck - https://www.canva.com/design/DAGz7nyJg7w/0MXdjse9g2O-fBJw8wSWhQ/edit?utm_content=DAGz7nyJg7w&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton
 
 ## Key Features
 
@@ -34,12 +36,18 @@ A revolutionary DeFi protocol built on Aptos that combines multi-token liquidity
 - Vault calculates proportional rLP tokens based on current pool value
 - rLP tokens represent ownership share in the multi-token pool
 - Pool generates yield from various DeFi activities
+  
+<img width="1005" height="842" alt="image" src="https://github.com/user-attachments/assets/3d9a8951-a6dd-404e-a0d0-ba31f4789a89" />
 
 ### 2. Automated Lending
 - Users deposit rLP tokens as collateral
 - Oracle provides real-time rLP pricing
 - Protocol enforces 50% Loan-to-Value (LTV) ratio
 - Users can borrow up to 50% of their collateral value in USDC
+
+<img width="1307" height="792" alt="image" src="https://github.com/user-attachments/assets/a9a06999-f006-4c62-bdd9-c79f8d866b45" />
+<img width="770" height="834" alt="image" src="https://github.com/user-attachments/assets/e49b78f6-3a2f-48c6-809a-7a4fdd1677a9" />
+
 
 ### 3. Auto-Repayment Mechanism
 - Yield generated from the liquidity pool accumulates
