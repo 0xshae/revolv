@@ -4,8 +4,6 @@ A revolutionary DeFi protocol built on Aptos that combines multi-token liquidity
 
 <img width="1356" height="790" alt="image" src="https://github.com/user-attachments/assets/14d353eb-6f80-4704-b9f8-7a5f68805b48" />
 
-## Pitch Deck - https://www.canva.com/design/DAGz7nyJg7w/0MXdjse9g2O-fBJw8wSWhQ/edit?utm_content=DAGz7nyJg7w&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton
-
 ## Key Features
 
 - **Multi-Token Liquidity Pool**: Deposit APT, USDC, and SUI into a unified vault
